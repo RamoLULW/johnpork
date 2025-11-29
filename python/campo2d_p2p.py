@@ -6,6 +6,7 @@ import numpy as np
 import agentpy as ap
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
+import time
 
 Coord = Tuple[int, int]
 
@@ -54,21 +55,17 @@ def turn_direction(cur:int, desired:int)->int:
 
 TIERRA, BUENA, MALA, MOJADA, ESTACION = 0, 1, 2, 3, 4
 
+# Función para construir rutas en franjas
 def build_stripe_routes(N:int, T:int)->List[List[Coord]]:
-    rutas: List[List[Coord]] = []
-    base, rem = N//T, N%T
-    c = 0; spans=[]
-    for i in range(T):
-        w = base + (1 if i < rem else 0)
-        spans.append((c, c+w-1)); c += w
-    for c0,c1 in spans:
-        cells=[]
-        for y in range(N):
-            cols = list(range(c0,c1+1))
-            if y%2==1: cols.reverse()
-            for x in cols: cells.append((x,y))
-        rutas.append(cells)
-    return rutas
+    bordes = []
+    for x in range(N):
+        bordes.append((x, 0))
+        bordes.append((x, N-1))
+    for y in range(1, N-1):
+        bordes.append((0, y))
+        bordes.append((N-1, y))
+    
+    return random.sample(bordes, T)
 
 class TractorAgent(ap.Agent):
     def setup(self):
@@ -86,6 +83,10 @@ class TractorAgent(ap.Agent):
         self.gasolina_max = 152.00
         self.costo_normal = 1.125
         self.costo_mojado = 3.375
+
+        self.celdas_asignadas: Set[Coord] = set()  
+        self.celdas_ocupadas: Set[Coord] = set()   
+        self.negociacion_completa = False
 
     def configure(self, *, priority:int, estacion:Coord, dir_idx:int, capacidad:int, ruta:list[Coord], gasolina_max: float, costo_normal: float, costo_mojado:float):
         self.priority = priority
@@ -129,13 +130,31 @@ class TractorAgent(ap.Agent):
 
     def propose_intent(self, target: Optional[Coord]):
         if target is None or target == self.pos_xy:
-            self.intent = ("AFK", None); return
-        dx, dy = target[0]-self.pos_xy[0], target[1]-self.pos_xy[1]
+            self.intent = ("AFK", None)
+            return
+        
+        dx, dy = target[0] - self.pos_xy[0], target[1] - self.pos_xy[1]
+        if abs(dx) > abs(dy):
+            dx = 1 if dx > 0 else -1
+            dy = 0
+        elif abs(dy) > abs(dx):
+            dy = 1 if dy > 0 else -1
+            dx = 0
+        else:
+            if dx != 0:
+                dx = 1 if dx > 0 else -1
+                dy = 0
+            else:
+                dy = 1 if dy > 0 else -1
+                dx = 0
+        
         desired = vec_to_dir(dx, dy)
         if desired != self.dir_idx:
             self.intent = ("INTENT_TURN", turn_direction(self.dir_idx, desired))
         else:
-            self.intent = ("INTENT_MOVE", target)
+            next_cell = (self.pos_xy[0] + dx, self.pos_xy[1] + dy)
+            self.intent = ("INTENT_MOVE", next_cell)
+
 
     def costo_celda(self, planta_tipo: int) -> int:
         if planta_tipo == MOJADA:
@@ -147,6 +166,17 @@ class TractorAgent(ap.Agent):
         dist2 = manhattan(meta,estacion)
         costo_promedio = (self.costo_normal + self.costo_mojado) // 2
         return (dist1 + dist2) * costo_promedio
+    
+    # El tractor elige sus celdas asignadas mediante negociación
+    def negociar_celdas(self, N: int, todas_celdas: Set[Coord], celdas_por_tractor: int) -> Set[Coord]:
+        disponibles = todas_celdas - self.celdas_ocupadas
+        
+        distancias = [(manhattan(celda, self.estacion), celda) 
+                    for celda in disponibles]
+        distancias.sort()  
+        
+        mis_celdas = {celda for _, celda in distancias[:celdas_por_tractor]}
+        return mis_celdas
 
 class CampoModel(ap.Model):
     def setup(self):
@@ -158,23 +188,55 @@ class CampoModel(ap.Model):
         np.random.seed(self.p.seed)
         self.plantas = np.zeros((self.N,self.N), dtype=np.int8)
         self.visitado = np.zeros((self.N,self.N), dtype=np.bool_)
-        rutas = build_stripe_routes(self.N, self.T)
+        estaciones = build_stripe_routes(self.N, self.T)
+        
         self.tractors = ap.AgentList(self, self.T, TractorAgent)
-
         self.gasolina_max = self.p.gasolina_max
         self.costo_normal = self.p.costo_normal
         self.costo_mojado= self.p.costo_mojado
         
         
         for i, ag in enumerate(self.tractors):
-            
-            start = rutas[i][0]
-            x0,y0 = start
+            start = estaciones[i] 
+            x0, y0 = start
             self.plantas[y0][x0] = ESTACION
             self.visitado[y0, x0] = True
 
-            ag.configure(priority=i, estacion=start, dir_idx=1, capacidad=self.capacity, ruta=rutas[i], gasolina_max = self.gasolina_max, costo_normal = self.costo_normal, costo_mojado = self.costo_mojado)
+            ag.configure(
+                priority=i, 
+                estacion=start, 
+                dir_idx=1, 
+                capacidad=self.capacity, 
+                ruta=[],  
+                gasolina_max=self.gasolina_max, 
+                costo_normal=self.costo_normal, 
+                costo_mojado=self.costo_mojado
+            )
+        self.fase_negociacion()
+        
         self.history = {"plants": [], "pos": [], "load": [], "tick": [], "gasolina": []}
+
+    # Los tractores negocian sus celdas asignadas
+    def fase_negociacion(self):
+        todas_celdas = {(x, y) for x in range(self.N) for y in range(self.N) 
+                        if self.plantas[y, x] != ESTACION}
+        
+        celdas_por_tractor = len(todas_celdas) // self.T
+        
+        # Negociación por turnos
+        for ag in sorted(self.tractors, key=lambda a: a.priority):
+            # Este tractor elige sus celdas
+            mis_celdas = ag.negociar_celdas(self.N, todas_celdas, celdas_por_tractor)
+            ag.celdas_asignadas = mis_celdas
+            
+            # Comunica a los demás tractores qué celdas tomé
+            for otro_ag in self.tractors:
+                if otro_ag.id != ag.id:
+                    otro_ag.celdas_ocupadas.update(mis_celdas)
+            
+            # Crear ruta óptima para estas celdas
+            ag.ruta = crear_ruta_optima(ag.estacion, mis_celdas)
+            ag.negociacion_completa = True
 
     def step(self):
         tick = len(self.history["tick"]) + 1
@@ -280,7 +342,25 @@ class CampoModel(ap.Model):
         if done or tick >= self.max_ticks:
             self.stop()
 
-def run_sim_and_animate(N:int, T:int, capacity:int, seed:int=42, max_ticks:int=2000, gasolina_max: float=152.00, costo_normal: float = 1.125):
+
+# Crear ruta óptima para un conjunto de celdas asignadas
+def crear_ruta_optima(estacion: Coord, celdas: Set[Coord]) -> List[Coord]:
+    if not celdas:
+        return []
+    
+    ruta = []
+    pendientes = set(celdas)
+    actual = estacion
+    
+    while pendientes:
+        cercana = min(pendientes, key=lambda c: manhattan(actual, c))
+        ruta.append(cercana)
+        pendientes.remove(cercana)
+        actual = cercana
+    
+    return ruta
+
+def run_sim_and_animate(N:int, T:int, capacity:int, seed:int=None, max_ticks:int=2000, gasolina_max: float=152.00, costo_normal: float = 1.125):
     pars = {'N': N, 'T': T, 'capacity': capacity, 'seed': seed, 'max_ticks': max_ticks, 'gasolina_max': gasolina_max, 'costo_normal': costo_normal, 'costo_mojado': costo_normal * 3}
     model = CampoModel(pars)
     model.run()
@@ -326,8 +406,7 @@ if __name__ == "__main__":
     N   = ask_int("Tamaño del campo (N x N)", default=12, minv=5, maxv=100)
     T   = ask_int("Número de tractores", default=4, minv=1, maxv=max(1, N//2))
     CAP = ask_int("Capacidad por tractor (celdas únicas)", default=max(1,(N*N)//(T*4)), minv=1, maxv=N*N)
-    SEED   = 42
+    SEED   = int(time.time()) % 10000
     MAX_T  = N*N*10
-
 
     run_sim_and_animate(N=N, T=T, capacity=CAP, seed=SEED, max_ticks=MAX_T)
