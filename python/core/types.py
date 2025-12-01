@@ -17,12 +17,20 @@ class TipoCelda(Enum):
     AGUA = "agua"
     CAMINO = "camino"
     OBSTACULO = "obstaculo"
+    LODO = "lodo"
+    ESTACION = "estacion"
+
+class TipoClima(Enum):
+    SOLEADO = "soleado"
+    LLUVIA = "lluvia"
+    NUBLADO = "nublado"
 
 @dataclass
 class TerrenoCelda:
     tipo: TipoCelda
     transitable: bool = True
     costo_mov: float = 1.0
+    metadata: Dict[str, Any] | None = None
 
 class EstadoAgente(Enum):
     AFK = "afk"
@@ -59,11 +67,19 @@ class EstadoTractorDTO:
     estado: str
     path: List[Tuple[float, float, float]]
 
+    combustible: float | None = None
+    combustible_max: float | None = None
+    carga_actual: int | None = None
+    capacidad_maxima: int | None = None
+
 @dataclass
 class AmbienteInfoDTO:
     size_x: int
     size_y: int
     size_z: int
+
+    clima: str | None = None
+    estaciones: List[Tuple[int, int, int]] | None = None
 
 __all__ = [
     "Coord2D",
@@ -76,4 +92,5 @@ __all__ = [
     "Mensaje",
     "EstadoTractorDTO",
     "AmbienteInfoDTO",
+    "TipoClima",
 ]

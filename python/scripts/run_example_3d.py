@@ -20,6 +20,16 @@ o
 from ..ambiente.ambiente_grid3d import AmbienteGrid3D
 from ..agentes.agente_tractor import TractorAgente
 from ..simulacion.simulacion import Simulacion
+from ..core.types import (
+    Coord2D,
+    Coord3D,
+    Dimensiones,
+    TerrenoCelda,
+    TipoCelda,
+    AmbienteInfoDTO,
+)
+from ..core.interfaces import IAmbiente
+
 
 
 def crear_ambiente_demo() -> AmbienteGrid3D:

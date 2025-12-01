@@ -1,8 +1,8 @@
 from __future__ import annotations
 import heapq
 from typing import Dict, List, Optional
-from core.types import Coord3D
-from core.interfaces import IAmbiente
+from ..core.types import Coord3D
+from ..core.interfaces import IAmbiente
 
 def heuristica_manhattan_3d(a: Coord3D, b: Coord3D) -> float:
     return abs(a[0] - b[0]) + abs(a[1] - b[1]) + abs(a[2] - b[2])

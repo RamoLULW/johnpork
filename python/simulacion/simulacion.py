@@ -1,8 +1,8 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
-from core.interfaces import ISimulacion, IAmbiente, ITractor
-from core.types import EstadoTractorDTO, AmbienteInfoDTO
+from ..core.interfaces import ISimulacion, IAmbiente, ITractor
+from ..core.types import EstadoTractorDTO, AmbienteInfoDTO
 
 @dataclass
 class Simulacion(ISimulacion):

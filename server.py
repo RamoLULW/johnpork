@@ -32,21 +32,22 @@ def fix_numpy(obj):
 
 @app.get("/")
 def root():
-    return{"status": "runing","endpoints": ["/simulated"]}
+    return {"status": "runing", "endpoints": ["/simulated"]}
 
 @app.post("/simulated")
 def json_camion(req: SimRequest):
-    history = run_simulation_return_history(req.N, req.T, req.capacity, req.p_good, req.seed, req.max_ticks)
+    history = run_simulation_return_history(
+        req.N, req.T, req.capacity, req.p_good, req.seed, req.max_ticks
+    )
     history = fix_numpy(history)
     frames = history.get("plants", [])
     resp = {
-        "plants": frames,      
-        "pos": history["pos"], 
+        "plants": frames,
+        "pos": history["pos"],
         "load": history["load"],
-        "tick": history["tick"]
+        "tick": history["tick"],
     }
     return JSONResponse(content=resp)
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=5000)
-

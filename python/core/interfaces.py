@@ -1,6 +1,6 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import Iterable, List, Protocol
+from typing import Iterable, List
 from .types import (
     Coord2D,
     Coord3D,
@@ -64,9 +64,9 @@ class IAgente(ABC):
     def step(self, tick_actual: int) -> None:
         raise NotImplementedError
     
-class ITractor(IAgente, Protocol):
+class ITractor(IAgente):
     def estado_dto(self) -> EstadoTractorDTO:
-        ...
+        raise NotImplementedError
 
 class ISimulacion(ABC):
     @abstractmethod
