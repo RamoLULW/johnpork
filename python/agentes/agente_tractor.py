@@ -10,7 +10,7 @@ from ..core.types import (
 from ..core.interfaces import ITractor, IAmbiente
 from ..pathfinding.astar_3d import astar_3d
 from ..aprendizaje.blackboard import BlackboardCampo
-from ..aprendizaje.q_learning import PoliticaQLearning, AccionTractor
+from ..aprendizaje.q_learning import PoliticaQLearning, AccionTractor, EstadoQL
 
 
 @dataclass
@@ -56,7 +56,7 @@ class TractorAgente(ITractor):
     def necesita_descargar(self) -> bool:
         return self.carga_actual >= self.capacidad_maxima
 
-    def _estado_q(self) -> tuple[int, int, int]:
+    def _estado_q(self) -> EstadoQL:
         combustible_bajo = 1 if self.necesita_recargar() else 0
         capacidad_llena = 1 if self.necesita_descargar() else 0
         planta_disponible = 0

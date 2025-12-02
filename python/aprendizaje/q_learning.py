@@ -3,9 +3,9 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Dict, Tuple, List
 import random
+import numpy as np
 
 EstadoQL = Tuple[int, int, int]
-
 
 class AccionTractor(Enum):
     IR_ESTACION = auto()
@@ -13,30 +13,38 @@ class AccionTractor(Enum):
     EXPLORAR = auto()
     MANTENER_META = auto()
 
-
 @dataclass
 class PoliticaQLearning:
     alpha: float = 0.1
     gamma: float = 0.9
-    epsilon: float = 0.1
-    q_table: Dict[Tuple[EstadoQL, AccionTractor], float] = field(default_factory=dict)
+    epsilon: float = 1.0
+    epsilon_min: float = 0.01
+    epsilon_decay: float = 0.9995
+    q_table: Dict[EstadoQL, np.ndarray] = field(default_factory=dict)
 
     def acciones_disponibles(self) -> List[AccionTractor]:
         return list(AccionTractor)
 
+    def _ensure_state(self, estado: EstadoQL) -> np.ndarray:
+        if estado not in self.q_table:
+            self.q_table[estado] = np.zeros(len(self.acciones_disponibles()), dtype=float)
+        return self.q_table[estado]
+
+    def _accion_to_index(self, accion: AccionTractor) -> int:
+        return self.acciones_disponibles().index(accion)
+
+    def _index_to_accion(self, idx: int) -> AccionTractor:
+        return self.acciones_disponibles()[idx]
+
     def valor_q(self, estado: EstadoQL, accion: AccionTractor) -> float:
-        return self.q_table.get((estado, accion), 0.0)
+        fila = self._ensure_state(estado)
+        idx = self._accion_to_index(accion)
+        return float(fila[idx])
 
     def mejor_accion(self, estado: EstadoQL) -> AccionTractor:
-        acciones = self.acciones_disponibles()
-        mejor = acciones[0]
-        mejor_valor = self.valor_q(estado, mejor)
-        for a in acciones[1:]:
-            v = self.valor_q(estado, a)
-            if v > mejor_valor:
-                mejor = a
-                mejor_valor = v
-        return mejor
+        fila = self._ensure_state(estado)
+        idx = int(np.argmax(fila))
+        return self._index_to_accion(idx)
 
     def elegir_accion(self, estado: EstadoQL) -> AccionTractor:
         if random.random() < self.epsilon:
@@ -50,8 +58,13 @@ class PoliticaQLearning:
         recompensa: float,
         estado_siguiente: EstadoQL,
     ) -> None:
-        q_actual = self.valor_q(estado, accion)
-        mejor_siguiente = self.valor_q(estado_siguiente, self.mejor_accion(estado_siguiente))
-        objetivo = recompensa + self.gamma * mejor_siguiente
-        nuevo_q = q_actual + self.alpha * (objetivo - q_actual)
-        self.q_table[(estado, accion)] = nuevo_q
+        fila_actual = self._ensure_state(estado)
+        fila_siguiente = self._ensure_state(estado_siguiente)
+        a_idx = self._accion_to_index(accion)
+        max_future_q = float(np.max(fila_siguiente))
+        current_q = float(fila_actual[a_idx])
+        nuevo_q = current_q + self.alpha * (recompensa + self.gamma * max_future_q - current_q)
+        fila_actual[a_idx] = nuevo_q
+
+    def decaer_epsilon(self) -> None:
+        self.epsilon = max(self.epsilon_min, self.epsilon * self.epsilon_decay)

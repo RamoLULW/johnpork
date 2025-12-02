@@ -1,11 +1,13 @@
 from __future__ import annotations
 from dataclasses import asdict
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 import random
 
 from ..ambiente.ambiente_grid3d import AmbienteGrid3D
 from ..agentes.agente_tractor import TractorAgente
 from ..core.types import Coord3D, EstadoAgente
+from ..aprendizaje.blackboard import BlackboardCampo
+from ..aprendizaje.q_learning import PoliticaQLearning
 from .simulacion import Simulacion
 
 
@@ -16,6 +18,8 @@ def run_simulation_return_history(
     p_good: float = 0.5,
     seed: int = 42,
     max_ticks: int = 2000,
+    politica_q: Optional[PoliticaQLearning] = None,
+    blackboard: Optional[BlackboardCampo] = None,
 ) -> Dict[str, Any]:
     random.seed(seed)
 
@@ -36,6 +40,9 @@ def run_simulation_return_history(
                 buena = random.random() < p_good
                 ambiente.poner_planta((x, y, 0), densa=False, buena=buena)
 
+    if blackboard is None:
+        blackboard = BlackboardCampo()
+
     tractores: List[TractorAgente] = []
     for i in range(T):
         meta: Coord3D = (size_x - 1, size_y - 1, 0)
@@ -46,6 +53,9 @@ def run_simulation_return_history(
             meta=meta,
             capacidad_maxima=capacity,
         )
+        tractor.blackboard = blackboard
+        if politica_q is not None:
+            tractor.politica_q = politica_q
         tractores.append(tractor)
 
     simulacion = Simulacion(_ambiente=ambiente, _tractores=tractores)

@@ -244,8 +244,10 @@ class AmbienteGrid3D(IAmbiente):
         if nuevo_clima == TipoClima.LLUVIA:
             for celda in self._celdas.values():
                 if celda.tipo == TipoCelda.TIERRA and celda.transitable:
+                    celda.tipo = TipoCelda.LODO
                     celda.costo_mov = max(celda.costo_mov, 3.0)
         else:
             for celda in self._celdas.values():
-                if celda.tipo == TipoCelda.TIERRA and celda.transitable:
+                if celda.tipo == TipoCelda.LODO and celda.transitable:
+                    celda.tipo = TipoCelda.TIERRA
                     celda.costo_mov = 1.0

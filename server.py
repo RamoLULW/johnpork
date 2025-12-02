@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from pydantic import BaseModel
 import uvicorn
 from camion import run_simulation_return_history
@@ -14,6 +14,7 @@ class SimRequest(BaseModel):
     p_good: float = 0.5
     seed: int = 42
     max_ticks: int = 500
+    use_qlearning: bool = False
 
 def fix_numpy(obj):
     if isinstance(obj, dict):
@@ -32,17 +33,23 @@ def fix_numpy(obj):
 
 @app.get("/")
 def root():
-    return {"status": "runing", "endpoints": ["/simulated"]}
+    return {"status": "running", "endpoints": ["/simulated"]}
 
 @app.post("/simulated")
 def json_camion(req: SimRequest):
     history = run_simulation_return_history(
-        req.N, req.T, req.capacity, req.p_good, req.seed, req.max_ticks
+        req.N,
+        req.T,
+        req.capacity,
+        req.p_good,
+        req.seed,
+        req.max_ticks,
+        req.use_qlearning,
     )
     history = fix_numpy(history)
-    frames = history.get("plants", [])
+    plants = history.get("plants", [])
     resp = {
-        "plants": frames,
+        "plants": plants,
         "pos": history["pos"],
         "load": history["load"],
         "tick": history["tick"],
