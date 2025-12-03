@@ -7,7 +7,7 @@ from app.agents.tractor import TractorAgent
 from app.agents.interfaces import IHighLevelPolicy
 
 
-def run_simulation(req: SimulationRequestDTO) -> SimulationResultDTO:
+def run_simulation(req: SimulationRequestDTO, policy: IHighLevelPolicy = None) -> SimulationResultDTO:
     env = Environment(
         N=req.N,
         p_good=req.p_good,
@@ -18,7 +18,8 @@ def run_simulation(req: SimulationRequestDTO) -> SimulationResultDTO:
     blackboard = Blackboard()
     for pos, is_good in env.iter_plants():
         blackboard.add_plant(pos)
-    policy: IHighLevelPolicy = QLearningPolicy(seed=req.seed) if req.use_qlearning else None
+    if policy is None:
+        policy: IHighLevelPolicy = QLearningPolicy(seed=req.seed) if req.use_qlearning else None
     tractors: List[TractorAgent] = []
     station_pos = env.nearest_station((0, 0))
     for i in range(req.num_tractors):
