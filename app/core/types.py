@@ -116,3 +116,4 @@ class SimulationResultDTO(BaseModel):
     terrain: List[TerrainDTO]
     frames: List[FrameDTO]
     stats: SimulationStatsDTO
+    dashboard_png: str 
