@@ -2,7 +2,7 @@ from typing import Dict, Tuple
 from app.core.types import HighLevelAction
 from app.agents.interfaces import IHighLevelPolicy
 import random
-
+import numpy as np
 
 class QLearningPolicy(IHighLevelPolicy):
     def __init__(self, alpha: float = 0.1, gamma: float = 0.95, epsilon: float = 0.1, seed: int = 42):
@@ -36,3 +36,6 @@ class QLearningPolicy(IHighLevelPolicy):
             max_next = 0.0
         new_q = old_q + self.alpha * (reward + self.gamma * max_next - old_q)
         self.q[key] = new_q
+
+    def decay_exploration(self):
+        self.epsilon = max(0.01, self.epsilon * 0.9995)
