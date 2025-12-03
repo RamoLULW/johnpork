@@ -6,7 +6,6 @@ matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
 
-
 from app.core.types import (
     SimulationRequestDTO,
     SimulationResultDTO,
